@@ -46,6 +46,7 @@ func main() {
 	}
 	cmds.register("login", handlerLogin)
 	cmds.register("register", handlerRegister)
+	cmds.register("reset", handlerReset)
 
 	loadedConfig, err := config.Read()
 	if err != nil {
@@ -134,6 +135,15 @@ func handlerRegister(s *state, cmd command) error {
 
 	fmt.Println("User registered successfully")
 	fmt.Printf("New user: %v\n", user)
+
+	return nil
+}
+
+func handlerReset(s *state, cmd command) error {
+	err := s.db.ResetUsers(context.Background())
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
