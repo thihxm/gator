@@ -1,14 +1,18 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"os"
 
+	_ "github.com/lib/pq"
 	"github.com/thihxm/gator/internal/config"
+	"github.com/thihxm/gator/internal/database"
 )
 
 type state struct {
-	config *config.Config
+	db  *database.Queries
+	cfg *config.Config
 }
 
 type command struct {
@@ -45,8 +49,20 @@ func main() {
 		os.Exit(1)
 		return
 	}
+
+	db, err := sql.Open("postgres", loadedConfig.DB_URL)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+		return
+	}
+
+	dbQueries := database.New(db)
+	defer db.Close()
+
 	s := &state{
-		config: &loadedConfig,
+		cfg: &loadedConfig,
+		db:  dbQueries,
 	}
 
 	args := os.Args
@@ -70,7 +86,7 @@ func handlerLogin(s *state, cmd command) error {
 		return fmt.Errorf("the login command requires a username")
 	}
 
-	err := s.config.SetUser(cmd.args[0])
+	err := s.cfg.SetUser(cmd.args[0])
 	if err != nil {
 		return err
 	}
