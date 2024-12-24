@@ -1,10 +1,13 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"os"
+	"time"
 
+	"github.com/google/uuid"
 	_ "github.com/lib/pq"
 	"github.com/thihxm/gator/internal/config"
 	"github.com/thihxm/gator/internal/database"
@@ -42,6 +45,7 @@ func main() {
 		cmds: make(map[string]func(*state, command) error),
 	}
 	cmds.register("login", handlerLogin)
+	cmds.register("register", handlerRegister)
 
 	loadedConfig, err := config.Read()
 	if err != nil {
@@ -86,12 +90,50 @@ func handlerLogin(s *state, cmd command) error {
 		return fmt.Errorf("the login command requires a username")
 	}
 
-	err := s.cfg.SetUser(cmd.args[0])
+	_, err := s.db.GetUser(
+		context.Background(),
+		cmd.args[0],
+	)
+	if err != nil {
+		return err
+	}
+
+	err = s.cfg.SetUser(cmd.args[0])
 	if err != nil {
 		return err
 	}
 
 	fmt.Printf("Logged in as %s\n", cmd.args[0])
+
+	return nil
+}
+
+func handlerRegister(s *state, cmd command) error {
+	if len(cmd.args) == 0 {
+		return fmt.Errorf("the login command requires a username")
+	}
+
+	user, err := s.db.CreateUser(
+		context.Background(),
+		database.CreateUserParams{
+			ID:        uuid.New(),
+			Name:      cmd.args[0],
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+		},
+	)
+
+	if err != nil {
+		return err
+	}
+
+	err = s.cfg.SetUser(user.Name)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("User registered successfully")
+	fmt.Printf("New user: %v\n", user)
 
 	return nil
 }
