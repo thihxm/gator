@@ -69,6 +69,7 @@ func main() {
 	cmds.register("reset", handlerReset)
 	cmds.register("users", handlerUsers)
 	cmds.register("agg", handlerAgg)
+	cmds.register("addfeed", handlerAddFeed)
 
 	loadedConfig, err := config.Read()
 	if err != nil {
@@ -232,4 +233,40 @@ func fetchFeed(ctx context.Context, feedURL string) (*RSSFeed, error) {
 	}
 
 	return &feed, nil
+}
+
+func handlerAddFeed(s *state, cmd command) error {
+	if len(cmd.args) <= 1 {
+		return fmt.Errorf("the add command requires a feed URL and a name")
+	}
+
+	name := cmd.args[0]
+	url := cmd.args[1]
+
+	currentUser, err := s.db.GetUser(
+		context.Background(),
+		*s.cfg.CurrentUserName,
+	)
+	if err != nil {
+		return err
+	}
+
+	feed, err := s.db.CreateFeed(
+		context.Background(),
+		database.CreateFeedParams{
+			ID:        uuid.New(),
+			Name:      name,
+			Url:       url,
+			UserID:    currentUser.ID,
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(feed)
+
+	return nil
 }
