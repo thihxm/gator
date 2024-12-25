@@ -6,7 +6,7 @@ CREATE TABLE feeds(
     name TEXT NOT NULL,
     url TEXT  NOT NULL UNIQUE,
     user_id UUID NOT NULL,
-    CONSTRAINT fx_user_id
+    CONSTRAINT fk_user_id
     FOREIGN KEY (user_id)
         REFERENCES users(id)
         ON DELETE CASCADE
