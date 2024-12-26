@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -193,14 +194,21 @@ func handlerUsers(s *state, cmd command) error {
 }
 
 func handlerAgg(s *state, cmd command) error {
-	feed, err := fetchFeed(context.Background(), "https://www.wagslane.dev/index.xml")
+	if len(cmd.args) == 0 {
+		return fmt.Errorf("the agg command requires a time period")
+	}
+
+	timeBetweenRequests, err := time.ParseDuration(cmd.args[0])
 	if err != nil {
 		return err
 	}
 
-	fmt.Println(feed)
+	fmt.Printf("Collecting feeds every %s\n", timeBetweenRequests)
 
-	return nil
+	ticker := time.NewTicker(timeBetweenRequests)
+	for ; ; <-ticker.C {
+		scrapeFeeds(s)
+	}
 }
 
 func fetchFeed(ctx context.Context, feedURL string) (*RSSFeed, error) {
@@ -374,6 +382,49 @@ func handlerUnfollow(s *state, cmd command, user database.User) error {
 	if err != nil {
 		return err
 	}
+
+	return nil
+}
+
+func scrapeFeeds(s *state) error {
+	feed, err := s.db.GetNextFeedToFetch(context.Background())
+	if err != nil {
+		return err
+	}
+
+	feed, err = s.db.MarkFeedFetched(
+		context.Background(),
+		database.MarkFeedFetchedParams{
+			ID: feed.ID,
+			LastFetchedAt: sql.NullTime{
+				Time:  time.Now(),
+				Valid: true,
+			},
+			UpdatedAt: time.Now(),
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	headerTitle := fmt.Sprintf("┃  Fetching feed `%s` at %s  ┃", feed.Name, feed.Url)
+	wrapper := strings.Repeat("━", len(headerTitle)-6)
+
+	fmt.Printf("\n┏%s┓\n", wrapper)
+	fmt.Println(headerTitle)
+	fmt.Printf("┗%s┛\n\n", wrapper)
+	data, err := fetchFeed(
+		context.Background(),
+		feed.Url,
+	)
+	if err != nil {
+		return err
+	}
+
+	for _, item := range data.Channel.Item {
+		fmt.Printf("Title: %s\n", item.Title)
+	}
+	fmt.Printf("\n━%s━\n\n", wrapper)
 
 	return nil
 }
