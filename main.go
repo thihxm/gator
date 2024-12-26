@@ -421,8 +421,45 @@ func scrapeFeeds(s *state) error {
 		return err
 	}
 
+	newPosts := 0
+
 	for _, item := range data.Channel.Item {
-		fmt.Printf("Title: %s\n", item.Title)
+		publishedAt, err := time.Parse(time.RFC1123Z, item.PubDate)
+		post, err := s.db.CreatePost(
+			context.Background(),
+			database.CreatePostParams{
+				ID:        uuid.New(),
+				CreatedAt: time.Now(),
+				UpdatedAt: time.Now(),
+				Title:     item.Title,
+				Url:       item.Link,
+				Description: sql.NullString{
+					String: item.Description,
+					Valid:  item.Description != "" && len(item.Description) > 0,
+				},
+				PublishedAt: sql.NullTime{
+					Time:  publishedAt,
+					Valid: err == nil,
+				},
+				FeedID: feed.ID,
+			},
+		)
+		if err != nil {
+			if !strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
+				fmt.Printf("Error creating post for: %s\n", item.Title)
+				fmt.Printf("Error: %v\n", err)
+			}
+			continue
+		}
+
+		newPosts++
+		fmt.Printf("Title: %s\n", post.Title)
+	}
+
+	if newPosts == 0 {
+		fmt.Println("No new posts found")
+	} else {
+		fmt.Printf("\nFound %d new post(s)\n", newPosts)
 	}
 	fmt.Printf("\n━%s━\n\n", wrapper)
 
